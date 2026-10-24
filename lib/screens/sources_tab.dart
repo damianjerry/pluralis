@@ -108,9 +108,13 @@ class SourcesTab extends StatelessWidget {
       ];
     }
 
+    if (categories.isEmpty) {
+      return sources.map((s) => _SourceTile(source: s)).toList();
+    }
+
     final widgets = <Widget>[];
 
-    // Group sources by category
+    // Group sources by user-created categories
     for (final cat in categories) {
       final matching = sources
           .where((s) => s.category.trim().toLowerCase() == cat.toLowerCase())
@@ -137,10 +141,12 @@ class SourcesTab extends StatelessWidget {
         .toList();
 
     if (uncategorized.isNotEmpty) {
-      widgets.add(const _CategoryGroupHeader(
-        title: 'Other',
-        count: null,
-      ));
+      if (widgets.isNotEmpty) {
+        widgets.add(const _CategoryGroupHeader(
+          title: 'Other',
+          count: null,
+        ));
+      }
       for (final source in uncategorized) {
         widgets.add(_SourceTile(source: source));
       }

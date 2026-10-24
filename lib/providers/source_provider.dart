@@ -15,24 +15,6 @@ class SourceProvider extends ChangeNotifier {
   Future<void> load() async {
     _sources = await _service.loadSources();
     _categories = await _service.loadCategories();
-
-    // Auto-discover existing categories from sources
-    final sourceCategories = _sources
-        .map((s) => s.category.trim())
-        .where((c) => c.isNotEmpty && c.toLowerCase() != 'custom')
-        .toSet();
-
-    bool changed = false;
-    for (final cat in sourceCategories) {
-      if (!_categories.any((c) => c.toLowerCase() == cat.toLowerCase())) {
-        _categories.add(cat);
-        changed = true;
-      }
-    }
-    if (changed) {
-      await _service.saveCategories(_categories);
-    }
-
     notifyListeners();
   }
 
@@ -47,13 +29,6 @@ class SourceProvider extends ChangeNotifier {
 
   Future<void> addSource(Source source) async {
     await _service.addCustomSource(source);
-    final cat = source.category.trim();
-    if (cat.isNotEmpty &&
-        cat.toLowerCase() != 'custom' &&
-        !_categories.any((c) => c.toLowerCase() == cat.toLowerCase())) {
-      _categories.add(cat);
-      await _service.saveCategories(_categories);
-    }
     await load();
   }
 
@@ -126,14 +101,7 @@ class SourceProvider extends ChangeNotifier {
     if (toAdd.isEmpty) return;
     for (final s in toAdd) {
       await _service.addCustomSource(s);
-      final cat = s.category.trim();
-      if (cat.isNotEmpty &&
-          cat.toLowerCase() != 'custom' &&
-          !_categories.any((c) => c.toLowerCase() == cat.toLowerCase())) {
-        _categories.add(cat);
-      }
     }
-    await _service.saveCategories(_categories);
     await load();
   }
 }

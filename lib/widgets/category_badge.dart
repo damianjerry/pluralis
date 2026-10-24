@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/source_provider.dart';
 
 const Map<String, Color> kCategoryColors = {
   'investigatif': Color(0xFF185FA5),
@@ -24,6 +26,15 @@ class CategoryBadge extends StatelessWidget {
     if (cat.isEmpty || cat.toLowerCase() == 'custom') {
       return const SizedBox.shrink();
     }
+
+    // Only show badge if it matches a user-created category
+    final sourceProvider = context.watch<SourceProvider>();
+    final isUserCategory = sourceProvider.categories
+        .any((c) => c.toLowerCase() == cat.toLowerCase());
+    if (!isUserCategory) {
+      return const SizedBox.shrink();
+    }
+
     final color = kCategoryColors[cat.toLowerCase()] ?? const Color(0xFF1A3A5C);
 
     return Container(

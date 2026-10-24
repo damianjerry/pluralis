@@ -12,7 +12,7 @@ class SourceService {
 
   Future<List<String>> loadCategories() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_categoriesKey) ?? ['Știri', 'Analize'];
+    return prefs.getStringList(_categoriesKey) ?? [];
   }
 
   Future<void> saveCategories(List<String> categories) async {
