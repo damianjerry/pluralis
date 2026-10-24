@@ -173,15 +173,87 @@ class SourcesTab extends StatelessWidget {
   }
 
   Future<void> _exportOpml(BuildContext context) async {
-    final sources = context.read<SourceProvider>().sources;
-    final service = ImportExportService();
-    final opml = service.exportOpml(sources);
+    try {
+      final sources = context.read<SourceProvider>().sources;
+      final service = ImportExportService();
+      final opml = service.exportOpml(sources);
 
-    final tempDir = await getTemporaryDirectory();
-    final file = await service.writeToTempFile(
-        opml, 'pluralis_sources.opml', tempDir.path);
+      // Save directly to Download folder so e-ink devices without a share sheet don't crash
+      final downloadDir = Directory('/storage/emulated/0/Download');
+      File file;
+      if (await downloadDir.exists()) {
+        file = File('${downloadDir.path}/pluralis_sources.opml');
+        await file.writeAsString(opml);
+      } else {
+        final tempDir = await getTemporaryDirectory();
+        file = await service.writeToTempFile(
+            opml, 'pluralis_sources.opml', tempDir.path);
+      }
 
-    await Share.shareXFiles([XFile(file.path)]);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Exported to: ${file.path}')),
+        );
+      }
+
+      try {
+        await Share.shareXFiles([XFile(file.path)]);
+      } catch (_) {}
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _exportCsv(BuildContext context) async {
+    try {
+      final sources = context.read<SourceProvider>().sources;
+      final service = ImportExportService();
+      final csv = service.exportSubstackCsv(sources);
+
+      final hasSubstacks =
+          sources.any((s) => s.cookie != null && s.cookie!.isNotEmpty);
+      if (!hasSubstacks) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text('No paid Substack sources with cookies to export')),
+          );
+        }
+        return;
+      }
+
+      final downloadDir = Directory('/storage/emulated/0/Download');
+      File file;
+      if (await downloadDir.exists()) {
+        file = File('${downloadDir.path}/pluralis_substacks.csv');
+        await file.writeAsString(csv);
+      } else {
+        final tempDir = await getTemporaryDirectory();
+        file = await service.writeToTempFile(
+            csv, 'pluralis_substacks.csv', tempDir.path);
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Exported to: ${file.path}')),
+        );
+      }
+
+      try {
+        await Share.shareXFiles([XFile(file.path)]);
+      } catch (_) {}
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Export error: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _importOpml(BuildContext context) async {
@@ -218,30 +290,6 @@ class SourcesTab extends StatelessWidget {
         );
       }
     }
-  }
-
-  Future<void> _exportCsv(BuildContext context) async {
-    final sources = context.read<SourceProvider>().sources;
-    final service = ImportExportService();
-    final csv = service.exportSubstackCsv(sources);
-
-    final hasSubstacks =
-        sources.any((s) => s.cookie != null && s.cookie!.isNotEmpty);
-    if (!hasSubstacks) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('No paid Substack sources with cookies to export')),
-        );
-      }
-      return;
-    }
-
-    final tempDir = await getTemporaryDirectory();
-    final file = await service.writeToTempFile(
-        csv, 'pluralis_substacks.csv', tempDir.path);
-
-    await Share.shareXFiles([XFile(file.path)]);
   }
 
   Future<void> _importCsv(BuildContext context) async {
