@@ -17,6 +17,12 @@ class FeedTab extends StatelessWidget {
     final feed = context.watch<FeedProvider>();
     final bookmarks = context.watch<BookmarkProvider>();
     final settings = context.watch<SettingsProvider>();
+    final sourceProvider = context.watch<SourceProvider>();
+
+    final selectedCat = feed.selectedCategory;
+    final subtitle = selectedCat != null
+        ? '${feed.articles.length} articles · $selectedCat'
+        : '${feed.articles.length} articles from ${feed.sourceCount} sources';
 
     return Scaffold(
       appBar: AppBar(
@@ -26,7 +32,7 @@ class FeedTab extends StatelessWidget {
             const Text('Pluralis'),
             if (feed.articles.isNotEmpty)
               Text(
-                '${feed.articles.length} articles from ${feed.sourceCount} sources',
+                subtitle,
                 style: Theme.of(context).textTheme.bodySmall,
               ),
           ],
@@ -36,16 +42,14 @@ class FeedTab extends StatelessWidget {
           IconButton(
             icon: Icon(
               settings.einkMode ? Icons.menu_book : Icons.menu_book_outlined,
-              color: settings.einkMode
-                  ? const Color(0xFFE8A020)
-                  : null,
+              color: settings.einkMode ? const Color(0xFFE8A020) : null,
             ),
             tooltip: settings.einkMode ? 'E-ink mode ON' : 'E-ink mode OFF',
             onPressed: () => settings.toggleEinkMode(),
           ),
           const FontSizeControls(),
           const SizedBox(width: 4),
-          // View mode toggle (replaces "n minutes ago")
+          // View mode toggle
           TextButton.icon(
             onPressed: () => feed.toggleViewMode(),
             icon: Icon(
@@ -72,16 +76,15 @@ class FeedTab extends StatelessWidget {
                 showAboutDialog(
                   context: context,
                   applicationName: 'Pluralis',
-                  applicationVersion: '1.5.0',
+                  applicationVersion: '1.5.2',
                   children: [
                     const Text(
-                      'E-ink friendly RSS reader\nAdd feeds via URL or OPML import',
+                      'E-ink friendly RSS reader with custom categories and lists.\nAdd feeds via URL or OPML import.',
                     ),
                     const Padding(
                       padding: EdgeInsets.only(top: 12),
                       child: Text(
-                        'Pierre Gallaz · developed with Claude Code\n'
-                        'Pierre Gallaz · développé avec Claude Code',
+                        'Pierre Gallaz · developed with Claude Code',
                       ),
                     ),
                   ],
@@ -97,7 +100,53 @@ class FeedTab extends StatelessWidget {
           ),
         ],
       ),
-      body: _buildBody(context, feed, bookmarks, settings),
+      body: Column(
+        children: [
+          _buildCategoryFilterBar(context, feed, sourceProvider),
+          Expanded(
+            child: _buildBody(context, feed, bookmarks, settings),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilterBar(
+      BuildContext context, FeedProvider feed, SourceProvider sourceProvider) {
+    final categories = sourceProvider.categories;
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    final selected = feed.selectedCategory ?? 'All';
+
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          bottom: BorderSide(
+            color: Colors.grey.withValues(alpha: 0.2),
+            width: 1,
+          ),
+        ),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          _CategoryFilterChip(
+            label: 'All',
+            isSelected: selected == 'All',
+            onTap: () => feed.selectCategory('All'),
+          ),
+          for (final cat in categories)
+            _CategoryFilterChip(
+              label: cat,
+              isSelected: selected.toLowerCase() == cat.toLowerCase(),
+              onTap: () => feed.selectCategory(cat),
+            ),
+        ],
+      ),
     );
   }
 
@@ -119,11 +168,11 @@ class FeedTab extends StatelessWidget {
 
   Widget _buildBody(BuildContext context, FeedProvider feed,
       BookmarkProvider bookmarks, SettingsProvider settings) {
-    if (feed.isLoading && feed.articles.isEmpty) {
+    if (feed.isLoading && feed.allArticles.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (feed.error != null && feed.articles.isEmpty) {
+    if (feed.error != null && feed.allArticles.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -146,6 +195,11 @@ class FeedTab extends StatelessWidget {
     }
 
     if (feed.articles.isEmpty) {
+      final selectedCat = feed.selectedCategory;
+      final emptyMessage = selectedCat != null
+          ? 'No articles in "$selectedCat"\nAssign sources to this category in the Sources tab'
+          : 'Pull down to refresh\nor enable sources in the Sources tab';
+
       return RefreshIndicator(
         onRefresh: () async {
           final sources = context.read<SourceProvider>().activeSources;
@@ -154,15 +208,18 @@ class FeedTab extends StatelessWidget {
         child: ListView(
           children: [
             SizedBox(
-              height: MediaQuery.of(context).size.height * 0.6,
+              height: MediaQuery.of(context).size.height * 0.5,
               child: Center(
-                child: Text(
-                  'Pull down to refresh\nor enable sources in the Sources tab',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyLarge
-                      ?.copyWith(color: Colors.grey),
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Text(
+                    emptyMessage,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodyLarge
+                        ?.copyWith(color: Colors.grey[700]),
+                  ),
                 ),
               ),
             ),
@@ -205,17 +262,16 @@ class FeedTab extends StatelessWidget {
   /// E-ink paged feed — page-up / page-down navigation
   Widget _buildPagedFeed(BuildContext context, FeedProvider feed,
       BookmarkProvider bookmarks, SettingsProvider settings) {
-    // Calculate how many articles fit per page
     final screenHeight = MediaQuery.of(context).size.height;
-    // Rough estimate: each card ~120px, minus AppBar+NavBar (~180px)
-    final cardsPerPage = ((screenHeight - 180) / 120).floor().clamp(2, 10);
+    // Rough estimate: each card ~120px, minus AppBar+NavBar+CategoryBar (~220px)
+    final cardsPerPage = ((screenHeight - 220) / 120).floor().clamp(2, 10);
     final totalPages = (feed.articles.length / cardsPerPage).ceil();
 
     return _PagedFeedView(
       articles: feed.articles,
       bookmarks: bookmarks,
       cardsPerPage: cardsPerPage,
-      totalPages: totalPages,
+      totalPages: totalPages > 0 ? totalPages : 1,
       einkMode: settings.einkMode,
       onOpenArticle: (article) =>
           _openArticle(context, article, settings.einkMode),
@@ -223,6 +279,50 @@ class FeedTab extends StatelessWidget {
         final sources = context.read<SourceProvider>().activeSources;
         await feed.refresh(sources);
       },
+    );
+  }
+}
+
+class _CategoryFilterChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _CategoryFilterChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 36, minWidth: 44),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.black : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? Colors.black : Colors.black87,
+              width: isSelected ? 1.5 : 1.2,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              color: isSelected ? Colors.white : Colors.black87,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -252,6 +352,14 @@ class _PagedFeedView extends StatefulWidget {
 
 class _PagedFeedViewState extends State<_PagedFeedView> {
   int _currentPage = 0;
+
+  @override
+  void didUpdateWidget(covariant _PagedFeedView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_currentPage >= widget.totalPages) {
+      _currentPage = (widget.totalPages - 1).clamp(0, widget.totalPages);
+    }
+  }
 
   void _nextPage() {
     if (_currentPage < widget.totalPages - 1) {
@@ -316,7 +424,8 @@ class _PagedFeedViewState extends State<_PagedFeedView> {
                   'Page ${_currentPage + 1} / ${widget.totalPages}',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.grey[600],
+                    color: Colors.grey[700],
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 IconButton(

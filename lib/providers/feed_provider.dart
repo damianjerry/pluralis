@@ -19,19 +19,68 @@ class FeedProvider extends ChangeNotifier {
   int _sourceCount = 0;
   FeedViewMode _viewMode = FeedViewMode.latest;
   Set<String> _activeSourceIds = {};
+  String? _selectedCategory;
 
-  List<Article> get articles =>
+  List<Article> get allArticles =>
       _viewMode == FeedViewMode.latest ? _chronoArticles : _perSourceArticles;
+
+  List<Article> get articles {
+    final list = allArticles;
+    if (_selectedCategory == null ||
+        _selectedCategory!.isEmpty ||
+        _selectedCategory == 'All') {
+      return list;
+    }
+    return list
+        .where((a) =>
+            a.category.trim().toLowerCase() ==
+            _selectedCategory!.trim().toLowerCase())
+        .toList();
+  }
+
+  String? get selectedCategory => _selectedCategory;
   bool get isLoading => _isLoading;
   String? get error => _error;
   DateTime? get lastRefresh => _lastRefresh;
   int get sourceCount => _sourceCount;
   FeedViewMode get viewMode => _viewMode;
 
+  int get filteredSourceCount {
+    if (_selectedCategory == null ||
+        _selectedCategory!.isEmpty ||
+        _selectedCategory == 'All') {
+      return _sourceCount;
+    }
+    return articles.map((a) => a.sourceId).toSet().length;
+  }
+
   /// Source IDs that returned at least one article on last fetch.
   Set<String> get activeSourceIds => _activeSourceIds;
 
   final RssService _rssService = RssService();
+
+  void selectCategory(String? category) {
+    if (category == 'All' || category == null || category.isEmpty) {
+      _selectedCategory = null;
+    } else {
+      _selectedCategory = category;
+    }
+    notifyListeners();
+  }
+
+  void updateSourceCategory(String sourceId, String newCategory) {
+    for (final a in _chronoArticles) {
+      if (a.sourceId == sourceId) {
+        a.category = newCategory;
+      }
+    }
+    for (final a in _perSourceArticles) {
+      if (a.sourceId == sourceId) {
+        a.category = newCategory;
+      }
+    }
+    notifyListeners();
+  }
 
   void toggleViewMode() {
     _viewMode = _viewMode == FeedViewMode.latest
@@ -97,7 +146,6 @@ class FeedProvider extends ChangeNotifier {
   /// Round-robin: 1 article per source, cycling through all sources.
   /// Sources ranked by most recent article.
   static List<Article> _buildPerSourceView(List<Article> sorted) {
-    // Group by source
     final bySource = <String, List<Article>>{};
     for (final a in sorted) {
       bySource.putIfAbsent(a.sourceId, () => []).add(a);

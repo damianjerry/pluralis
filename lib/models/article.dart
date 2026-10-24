@@ -7,11 +7,11 @@ class Article {
   final DateTime? publishedAt;
   final String sourceName;
   final String sourceId;
-  final String category;
+  String category;
   final String lang;
   final String? fullContent; // content:encoded from RSS, if available
 
-  const Article({
+  Article({
     required this.id,
     required this.title,
     this.description,

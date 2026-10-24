@@ -20,16 +20,21 @@ class CategoryBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = kCategoryColors[category] ?? const Color(0xFF607D8B);
+    final cat = category.trim();
+    if (cat.isEmpty || cat.toLowerCase() == 'custom') {
+      return const SizedBox.shrink();
+    }
+    final color = kCategoryColors[cat.toLowerCase()] ?? const Color(0xFF1A3A5C);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.35), width: 0.8),
       ),
       child: Text(
-        category,
+        cat,
         style: TextStyle(
           fontSize: 10,
           color: color,

@@ -7,6 +7,18 @@ class SourceService {
   static const _sourcesKey = 'sources_state';
   static const _customSourcesKey = 'custom_sources';
   static const _removedDefaultsKey = 'removed_default_sources';
+  static const _categoriesKey = 'user_categories';
+  static const _sourceCategoryOverridesKey = 'source_category_overrides';
+
+  Future<List<String>> loadCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_categoriesKey) ?? ['Știri', 'Analize'];
+  }
+
+  Future<void> saveCategories(List<String> categories) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_categoriesKey, categories);
+  }
 
   Future<List<Source>> loadSources() async {
     final prefs = await SharedPreferences.getInstance();
@@ -14,6 +26,12 @@ class SourceService {
     // Load removed default IDs
     final removedDefaults =
         (prefs.getStringList(_removedDefaultsKey) ?? []).toSet();
+
+    // Load category overrides (for default sources)
+    final overridesStr = prefs.getString(_sourceCategoryOverridesKey);
+    final overrides = overridesStr != null
+        ? Map<String, dynamic>.from(json.decode(overridesStr) as Map)
+        : <String, dynamic>{};
 
     // Load defaults from asset, filtering out removed ones
     final jsonStr = await rootBundle.loadString('assets/sources.json');
@@ -23,6 +41,12 @@ class SourceService {
             Source.fromJson(j as Map<String, dynamic>, isDefault: true))
         .where((s) => !removedDefaults.contains(s.id))
         .toList();
+
+    for (final s in defaults) {
+      if (overrides.containsKey(s.id)) {
+        s.category = overrides[s.id] as String;
+      }
+    }
 
     // Load saved active/inactive state
     final stateStr = prefs.getString(_sourcesKey);
@@ -63,6 +87,14 @@ class SourceService {
     final customSources =
         sources.where((s) => !s.isDefault).map((s) => s.toJson()).toList();
     await prefs.setString(_customSourcesKey, json.encode(customSources));
+
+    // Save category overrides for default sources
+    final defaultOverrides = <String, String>{};
+    for (final s in sources.where((s) => s.isDefault)) {
+      defaultOverrides[s.id] = s.category;
+    }
+    await prefs.setString(
+        _sourceCategoryOverridesKey, json.encode(defaultOverrides));
   }
 
   Future<void> addCustomSource(Source source) async {
