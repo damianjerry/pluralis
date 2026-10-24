@@ -76,15 +76,16 @@ class FeedTab extends StatelessWidget {
                 showAboutDialog(
                   context: context,
                   applicationName: 'Pluralis',
-                  applicationVersion: '1.5.2',
+                  applicationVersion: '1.0',
                   children: [
                     const Text(
-                      'E-ink friendly RSS reader with custom categories and lists.\nAdd feeds via URL or OPML import.',
+                      'E-ink friendly RSS reader with custom categories and persistent feeds.\nAdd feeds via URL or OPML import.',
                     ),
                     const Padding(
                       padding: EdgeInsets.only(top: 12),
                       child: Text(
-                        'Pierre Gallaz · developed with Claude Code',
+                        '1.0 by Damian Gerard · forked from Pluralis by Pierre Gallaz',
+                        style: TextStyle(fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],

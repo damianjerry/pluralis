@@ -12,7 +12,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SourceProvider()..load()),
-        ChangeNotifierProvider(create: (_) => FeedProvider()),
+        ChangeNotifierProvider(create: (_) => FeedProvider()..initCache()),
         ChangeNotifierProvider(create: (_) => BookmarkProvider()..init()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()..load()),
       ],

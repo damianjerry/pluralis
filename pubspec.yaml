@@ -1,7 +1,7 @@
 name: pluralis
-description: Alternative news aggregator — EN & FR RSS feeds
+description: E-ink friendly RSS reader with custom categories and persistent feeds
 publish_to: 'none'
-version: 1.6.1+2010
+version: 1.0.0+2012
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
